@@ -1,0 +1,29 @@
+server:
+  port: 8888
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://127.0.0.1:3000"
+    - "*"
+
+tts:
+  #model_path: "models/fine-tuning-model/v2/finetuning_pretrained_vi.onnx"
+  #config_path: "models/fine-tuning-model/v2/finetuning_pretrained_vi.onnx.json"
+  model_path: "models/default/vi_VN-vais1000-medium.onnx"
+  config_path: "models/default/vi_VN-vais1000-medium.onnx.json"
+  audio_output_dir: "audio/"
+  cache_size: 100
+  default_speed: "normal"
+  noise_scale: 0.5
+  noise_w: 0.6
+
+logging:
+  level: "INFO"
+  file: "logs/tts_server.log"
+  max_file_size: "10MB"
+  backup_count: 5
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+
+debug:
+  enabled: false
+  log_performance: false
+  log_function_calls: false

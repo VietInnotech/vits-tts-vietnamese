@@ -3,7 +3,7 @@
 !.pixi/config.toml
 pixi.lock
 
-
+models/*
 # Python virtual environments
 venv/
 .venv/
@@ -12,6 +12,7 @@ venv/
 audio/*
 !audio/test_finetuning.wav
 !audio/test_original.wav
+!audio/test_smoother_voice.wav
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -72,3 +73,4 @@ node_modules/
 
 # Pixi cache
 .pixi/cache/
+data/logs/*

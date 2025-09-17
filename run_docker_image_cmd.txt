@@ -1,1 +1,0 @@
-docker run -d -p 5004:8888 vits-tts-vi:v1.0
