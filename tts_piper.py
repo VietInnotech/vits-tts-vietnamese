@@ -40,7 +40,7 @@ class PiperTTS:
         self.voice = PiperVoice.load(model_path)
 
         # Load configuration
-        with open(self.config_path, "r") as f:
+        with open(self.config_path, "r", encoding="utf-8") as f:
             self.config = json.load(f)
 
     def text_to_speech(

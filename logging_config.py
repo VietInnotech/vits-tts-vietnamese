@@ -10,7 +10,8 @@ from config import get_logging_config
 
 def configure_logger():
     """
-    Configure loguru logger with JSON format and settings from config.yaml.
+    Configure loguru logger with default format for stdout and file.
+    Console output will be colorized, file output will not.
 
     Returns:
         Configured logger instance
@@ -22,21 +23,18 @@ def configure_logger():
     # Remove default handler to avoid duplicate logs
     loguru_logger.remove()
 
-    # Add JSON formatted handler to stdout
+    # Add handler to stdout with default format and colorization
     loguru_logger.add(
         sys.stdout,
-        format="{time} | {level} | {name} | {function} | {line} | {message}",
-        serialize=True,  # Enable JSON serialization
         level=log_level,
+        colorize=True,  # Enable colorization for console
         backtrace=True,
         diagnose=True,
     )
 
-    # Add file handler for persistent logging
+    # Add file handler for persistent logging with default format (no colors)
     loguru_logger.add(
         "logs/tts_server.log",
-        format="{time} | {level} | {name} | {function} | {line} | {message}",
-        serialize=True,
         level=log_level,
         rotation="10 MB",
         retention="7 days",
