@@ -1,7 +1,8 @@
 import tornado.ioloop
 import tornado.web
+import tornado.gen
 from validate import validate_query_params
-from tts import text_to_speech 
+from tts import text_to_speech, text_to_speech_streaming
 import hashlib
 import os
 import argparse
@@ -35,9 +36,49 @@ class MyHandler(tornado.web.RequestHandler):
         self.set_header("Access-Control-Allow-Headers", "x-requested-with")
         self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
 
+class StreamingTTSHandler(tornado.web.RequestHandler):
+    @tornado.gen.coroutine
+    @validate_query_params(query_param_schema)
+    def get(self):
+        # Parameters are already validated here
+        text:str = self.get_argument('text')
+        speed:str = self.get_argument('speed')
+        
+        # Set appropriate headers for audio streaming
+        self.set_header('Content-Type', 'audio/wav')
+        self.set_header('Cache-Control', 'no-cache')
+        self.set_header('Pragma', 'no-cache')
+        
+        try:
+            # Generate audio data using the streaming function
+            audio_buffer = text_to_speech_streaming(text, speed, "pretrained_vi.onnx")
+            
+            # Stream the audio data in chunks
+            chunk_size = 8192  # 8KB chunks
+            while True:
+                chunk = audio_buffer.read(chunk_size)
+                if not chunk:
+                    break
+                self.write(chunk)
+                yield self.flush()  # Ensure data is sent immediately
+            
+            # Finish the response
+            self.finish()
+            
+        except Exception as e:
+            self.set_status(500)
+            self.write({"error": str(e)})
+            self.finish()
+    
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+        self.set_header("Access-Control-Allow-Headers", "x-requested-with")
+        self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+
 def make_app(enable_ui=True):
     handlers = [
         (r"/tts", MyHandler),
+        (r"/tts/stream", StreamingTTSHandler),
         (r'/audio/(.*)', tornado.web.StaticFileHandler, {'path': os.getcwd()+"/audio/"}),
         (r'/assets/(.*)', tornado.web.StaticFileHandler, {'path': os.getcwd()+"/assets/"}),
     ]

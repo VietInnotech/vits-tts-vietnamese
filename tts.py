@@ -13,6 +13,7 @@ import hashlib
 from typing import List
 from wavfile import write as write_wav
 from piper_phonemize import phonemize_codepoints, phonemize_espeak, tashkeel_run
+from io import BytesIO
 
 SPEED_VALUES = {"very_slow":1.5,
                 "slow":1.2,
@@ -80,6 +81,63 @@ def text_to_speech(text:str,speed:str,model_name:str,hash_of_text:str):
     output_path = output_dir + f"/{hash_of_text}.wav"
     write_wav(str(output_path), SAMPLE_RATE, audio)
     return output_path
+
+
+def text_to_speech_streaming(text:str,speed:str,model_name:str):
+    """Streaming version that returns audio data as BytesIO buffer"""
+    
+    speed = speed.strip()
+    if speed not in SPEED_VALUES:
+        raise ValueError(f"Invalid speed value: {speed}. Must be one of: {list(SPEED_VALUES.keys())}")
+    length_scale = float(SPEED_VALUES[speed])
+    
+    sess_options = onnxruntime.SessionOptions()
+    model = onnxruntime.InferenceSession(model_name, sess_options=sess_options)
+    config = load_config(model_name)
+    text = text.strip()
+    phonemes_list = phonemize(config, text)
+    phoneme_ids = []
+    for phonemes in phonemes_list:
+      phoneme_ids.append(phonemes_to_ids(config, phonemes))
+
+    speaker_id = None
+    phoneme_ids_flatten = []
+    for i in phoneme_ids:
+        phoneme_ids_flatten += i + [0,0,0]
+    text = np.expand_dims(np.array(phoneme_ids_flatten, dtype=np.int64), 0)
+    text_lengths = np.array([text.shape[1]], dtype=np.int64)
+    scales = np.array(
+        [NOISE_SCALE, length_scale, NOISE_SCALE_W],
+        dtype=np.float32,
+    )
+    sid = None
+
+    if speaker_id is not None:
+        sid = np.array([speaker_id], dtype=np.int64)
+
+    start_time = time.perf_counter()
+    audio = model.run(
+        None,
+        {
+            "input": text,
+            "input_lengths": text_lengths,
+            "scales": scales,
+            "sid": sid,
+        },
+    )[0].squeeze((0, 1))
+    # audio = denoise(audio, bias_spec, 10)
+    audio = audio_float_to_int16(audio.squeeze())
+    end_time = time.perf_counter()
+
+    audio_duration_sec = audio.shape[-1] / SAMPLE_RATE
+    infer_sec = end_time - start_time
+    
+    # Create BytesIO buffer and write WAV data directly to it
+    audio_buffer = BytesIO()
+    write_wav(audio_buffer, SAMPLE_RATE, audio)
+    audio_buffer.seek(0)  # Reset buffer position to beginning
+    
+    return audio_buffer
 
 
 
@@ -219,4 +277,3 @@ def transform(input_data):
     phase = np.arctan2(imag_part.data, real_part.data)
 
     return magnitude, phase
-
