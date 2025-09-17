@@ -10,7 +10,8 @@ import os
 import numpy as np
 import onnxruntime
 import hashlib
-from typing import List
+from typing import List, Optional, Union, Any, Sequence
+from numpy.typing import NDArray
 from wavfile import write as write_wav
 from piper_phonemize import phonemize_codepoints, phonemize_espeak, tashkeel_run
 from io import BytesIO
@@ -28,7 +29,7 @@ BOS = "^"  # beginning of sentence
 EOS = "$"  # end of sentence
 
 
-def text_to_speech(text:str,speed:str,model_name:str,hash_of_text:str):
+def text_to_speech(text:str,speed:str,model_name:str,hash_of_text:str) -> str:
     """Main entry point"""
 
     speed = speed.strip()
@@ -48,8 +49,8 @@ def text_to_speech(text:str,speed:str,model_name:str,hash_of_text:str):
     phoneme_ids_flatten = []
     for i in phoneme_ids:
         phoneme_ids_flatten += i + [0,0,0]
-    text = np.expand_dims(np.array(phoneme_ids_flatten, dtype=np.int64), 0)
-    text_lengths = np.array([text.shape[1]], dtype=np.int64)
+    text_array = np.expand_dims(np.array(phoneme_ids_flatten, dtype=np.int64), 0)
+    text_lengths = np.array([text_array.shape[1]], dtype=np.int64)
     scales = np.array(
         [NOISE_SCALE, length_scale, NOISE_SCALE_W],
         dtype=np.float32,
@@ -60,15 +61,17 @@ def text_to_speech(text:str,speed:str,model_name:str,hash_of_text:str):
         sid = np.array([speaker_id], dtype=np.int64)
 
     start_time = time.perf_counter()
-    audio = model.run(
+    audio_output = model.run(
         None,
         {
-            "input": text,
+            "input": text_array,
             "input_lengths": text_lengths,
             "scales": scales,
             "sid": sid,
         },
-    )[0].squeeze((0, 1))
+    )
+    # Cast the output to numpy array and squeeze dimensions
+    audio = np.asarray(audio_output[0]).squeeze((0, 1))
     # audio = denoise(audio, bias_spec, 10)
     audio = audio_float_to_int16(audio.squeeze())
     end_time = time.perf_counter()
@@ -83,7 +86,7 @@ def text_to_speech(text:str,speed:str,model_name:str,hash_of_text:str):
     return output_path
 
 
-def text_to_speech_streaming(text:str,speed:str,model_name:str):
+def text_to_speech_streaming(text:str,speed:str,model_name:str) -> BytesIO:
     """Streaming version that returns audio data as BytesIO buffer"""
     
     speed = speed.strip()
@@ -104,8 +107,8 @@ def text_to_speech_streaming(text:str,speed:str,model_name:str):
     phoneme_ids_flatten = []
     for i in phoneme_ids:
         phoneme_ids_flatten += i + [0,0,0]
-    text = np.expand_dims(np.array(phoneme_ids_flatten, dtype=np.int64), 0)
-    text_lengths = np.array([text.shape[1]], dtype=np.int64)
+    text_array = np.expand_dims(np.array(phoneme_ids_flatten, dtype=np.int64), 0)
+    text_lengths = np.array([text_array.shape[1]], dtype=np.int64)
     scales = np.array(
         [NOISE_SCALE, length_scale, NOISE_SCALE_W],
         dtype=np.float32,
@@ -116,15 +119,17 @@ def text_to_speech_streaming(text:str,speed:str,model_name:str):
         sid = np.array([speaker_id], dtype=np.int64)
 
     start_time = time.perf_counter()
-    audio = model.run(
+    audio_output = model.run(
         None,
         {
-            "input": text,
+            "input": text_array,
             "input_lengths": text_lengths,
             "scales": scales,
             "sid": sid,
         },
-    )[0].squeeze((0, 1))
+    )
+    # Cast the output to numpy array and squeeze dimensions
+    audio = np.asarray(audio_output[0]).squeeze((0, 1))
     # audio = denoise(audio, bias_spec, 10)
     audio = audio_float_to_int16(audio.squeeze())
     end_time = time.perf_counter()
@@ -142,8 +147,8 @@ def text_to_speech_streaming(text:str,speed:str,model_name:str):
 
 
 def audio_float_to_int16(
-    audio: np.ndarray, max_wav_value: float = 32767.0
-) -> np.ndarray:
+    audio: NDArray[np.float32], max_wav_value: float = 32767.0
+) -> NDArray[np.int16]:
     """Normalize audio and convert to int16 range"""
     audio_norm = audio * (max_wav_value / max(0.01, np.max(np.abs(audio))))
     audio_norm = np.clip(audio_norm, -max_wav_value, max_wav_value)
@@ -170,24 +175,24 @@ def phonemize(config, text: str) -> List[List[str]]:
 def phonemes_to_ids(config, phonemes: List[str]) -> List[int]:
     """Phonemes to ids."""
     id_map = config["phoneme_id_map"]
-    ids: List[int] = list(id_map[BOS])
+    ids: List[int] = []
     for phoneme in phonemes:
         if phoneme not in id_map:
             print("Missing phoneme from id map: %s", phoneme)
             continue
         ids.extend(id_map[phoneme])
-        ids.extend(id_map[PAD])
-    ids.extend(id_map[EOS])
+        ids.extend(id_map[PAD])  # Add padding between phonemes
+    ids.extend(id_map[EOS])  # Add end of sentence marker
     return ids
 
-def load_config(model):
+def load_config(model: str) -> dict:
     with open(f"{model}.json", "r") as file:
         config = json.load(file)
     return config
 
 def denoise(
-    audio: np.ndarray, bias_spec: np.ndarray, denoiser_strength: float
-) -> np.ndarray:
+    audio: NDArray[np.float32], bias_spec: NDArray[np.float32], denoiser_strength: float
+) -> NDArray[np.float32]:
     audio_spec, audio_angles = transform(audio)
 
     a = bias_spec.shape[-1]
@@ -197,12 +202,12 @@ def denoise(
 
     audio_spec_denoised = audio_spec - (bias_spec_repeat * denoiser_strength)
     audio_spec_denoised = np.clip(audio_spec_denoised, a_min=0.0, a_max=None)
-    audio_denoised = inverse(audio_spec_denoised, audio_angles)
+    audio_denoised = inverse(audio_spec_denoised.astype(np.float32), audio_angles.astype(np.float32))
 
     return audio_denoised
 
 
-def stft(x, fft_size, hopsamp):
+def stft(x: NDArray[np.float32], fft_size: int, hopsamp: int) -> NDArray[np.complex128]:
     """Compute and return the STFT of the supplied time domain signal x.
     Args:
         x (1-dim Numpy array): A time domain signal.
@@ -222,7 +227,7 @@ def stft(x, fft_size, hopsamp):
     )
 
 
-def istft(X, fft_size, hopsamp):
+def istft(X: NDArray[np.complex128], fft_size: int, hopsamp: int) -> NDArray[np.float32]:
     """Invert a STFT into a time domain signal.
     Args:
         X (2-dim Numpy array): Input spectrogram. The rows are the time slices and columns are the frequency bins.
@@ -236,13 +241,13 @@ def istft(X, fft_size, hopsamp):
     window = np.hanning(fft_size)
     time_slices = X.shape[0]
     len_samples = int(time_slices * hopsamp + fft_size)
-    x = np.zeros(len_samples)
+    x = np.zeros(len_samples, dtype=np.float32)
     for n, i in enumerate(range(0, len(x) - fft_size, hopsamp)):
         x[i : i + fft_size] += window * np.real(np.fft.irfft(X[n]))
     return x
 
 
-def inverse(magnitude, phase):
+def inverse(magnitude: NDArray[np.float32], phase: NDArray[np.float32]) -> NDArray[np.float32]:
     recombine_magnitude_phase = np.concatenate(
         [magnitude * np.cos(phase), magnitude * np.sin(phase)], axis=1
     )
@@ -262,7 +267,7 @@ def inverse(magnitude, phase):
     return inverse_transform
 
 
-def transform(input_data):
+def transform(input_data: NDArray[np.float32]) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
     x = input_data
     real_part = []
     imag_part = []
