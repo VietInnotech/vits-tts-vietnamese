@@ -4,6 +4,8 @@ from validate import validate_query_params
 from tts import text_to_speech 
 import hashlib
 import os
+import argparse
+
 # Define a JSON schema for your query parameters
 query_param_schema = {
     "type": "object",
@@ -33,13 +35,17 @@ class MyHandler(tornado.web.RequestHandler):
         self.set_header("Access-Control-Allow-Headers", "x-requested-with")
         self.set_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
 
-def make_app():
-    return tornado.web.Application([
-        (r'/', HomeHandler),
+def make_app(enable_ui=True):
+    handlers = [
         (r"/tts", MyHandler),
         (r'/audio/(.*)', tornado.web.StaticFileHandler, {'path': os.getcwd()+"/audio/"}),
         (r'/assets/(.*)', tornado.web.StaticFileHandler, {'path': os.getcwd()+"/assets/"}),
-    ])
+    ]
+    
+    if enable_ui:
+        handlers.append((r'/', HomeHandler))
+    
+    return tornado.web.Application(handlers)
 
 def handle_tts_request(text,speed):
     text_hash:str = hashlib.sha1((text+speed).encode('utf-8')).hexdigest()
@@ -62,6 +68,10 @@ def handle_tts_request(text,speed):
             },file_name)
     
 if __name__ == "__main__":
-    app = make_app()
+    parser = argparse.ArgumentParser(description='TTS Server')
+    parser.add_argument('--no-ui', action='store_true', help='Disable the web interface')
+    args = parser.parse_args()
+    
+    app = make_app(enable_ui=not args.no_ui)
     app.listen(8888)
     tornado.ioloop.IOLoop.current().start()

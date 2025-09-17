@@ -1,2 +1,2 @@
 # Run the Python script
-python server.py
+python server.py "$@"
