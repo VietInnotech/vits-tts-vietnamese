@@ -1,0 +1,13 @@
+server:
+  port: 8888
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://127.0.0.1:3000"
+
+tts:
+  model_path: "fine-tuning-model/v2/finetuning_pretrained_vi.onnx"
+  config_path: "fine-tuning-model/v2/finetuning_pretrained_vi.onnx.json"
+  audio_output_dir: "audio/"
+
+logging:
+  level: "INFO"

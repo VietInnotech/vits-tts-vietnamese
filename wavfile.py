@@ -8,6 +8,7 @@ Functions
 `write`: Write a NumPy array as a WAV file.
 
 """
+
 import io
 import struct
 import sys
@@ -815,7 +816,7 @@ def write(filename, rate, data):
             block_align,
             bit_depth,
         )
-        if not (dkind in ("i", "u")):
+        if dkind not in ("i", "u"):
             # add cbSize field for non-PCM files
             fmt_chunk_data += b"\x00\x00"
 
@@ -823,7 +824,7 @@ def write(filename, rate, data):
         header_data += fmt_chunk_data
 
         # fact chunk (non-PCM files)
-        if not (dkind in ("i", "u")):
+        if dkind not in ("i", "u"):
             header_data += b"fact"
             header_data += struct.pack("<II", 4, data.shape[0])
 
