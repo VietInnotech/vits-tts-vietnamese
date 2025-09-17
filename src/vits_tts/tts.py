@@ -13,6 +13,7 @@ import wave
 
 from piper import PiperVoice, SynthesisConfig
 from .config import get_tts_config
+from .logging_config import logger
 
 # Speed mapping - same as original
 SPEED_VALUES = {
@@ -37,7 +38,7 @@ class PiperTTS:
         self.config_path = f"{model_path}.json"
 
         # Load the voice model
-        print(f"Loading Piper voice model: {model_path}")
+        logger.info(f"Loading Piper voice model: {model_path}")
         self.voice = PiperVoice.load(model_path)
 
         # Load configuration
@@ -109,7 +110,7 @@ class PiperTTS:
             noise_w_scale=self.noise_w,
         )
 
-        print(f"Synthesizing with speed '{speed}' (length_scale={length_scale})")
+        logger.info(f"Synthesizing with speed '{speed}' (length_scale={length_scale})")
         start_time = time.perf_counter()
 
         # Synthesize to WAV file
@@ -119,8 +120,8 @@ class PiperTTS:
         end_time = time.perf_counter()
         infer_sec = end_time - start_time
 
-        print(f"Synthesis completed in {infer_sec:.3f} seconds")
-        print(f"Audio saved to: {output_path}")
+        logger.info(f"Synthesis completed in {infer_sec:.3f} seconds")
+        logger.info(f"Audio saved to: {output_path}")
 
         return output_path
 
@@ -158,7 +159,7 @@ class PiperTTS:
             noise_w_scale=self.noise_w,
         )
 
-        print(f"Streaming synthesis with speed '{speed}' (length_scale={length_scale})")
+        logger.info(f"Streaming synthesis with speed '{speed}' (length_scale={length_scale})")
         start_time = time.perf_counter()
 
         # Use streaming synthesis
@@ -197,7 +198,7 @@ class PiperTTS:
         end_time = time.perf_counter()
         infer_sec = end_time - start_time
 
-        print(f"Streaming synthesis completed in {infer_sec:.3f} seconds")
+        logger.info(f"Streaming synthesis completed in {infer_sec:.3f} seconds")
 
         return audio_buffer
 
@@ -232,11 +233,11 @@ def get_available_voices() -> list:
 
 if __name__ == "__main__":
     # Test the new implementation
-    print("Testing Piper TTS implementation...")
+    logger.info("Testing Piper TTS implementation...")
 
     tts = PiperTTS("models/pretrained_vi.onnx")
 
     test_text = "Xin chào! Đây là thử nghiệm với Piper TTS."
     output_path = tts.text_to_speech(test_text, "normal")
 
-    print(f"Test completed. Audio saved to: {output_path}")
+    logger.info(f"Test completed. Audio saved to: {output_path}")

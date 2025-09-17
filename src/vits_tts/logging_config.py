@@ -1,130 +1,156 @@
+"""Loguru-based logging configuration for the TTS service.
+Enables colored console output and intercepts standard logging to preserve ANSI colors.
+"""
 import logging
-import logging.config
+import sys
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-# Default logging configuration
-DEFAULT_LOGGING_CONFIG: Dict[str, Any] = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "standard": {
-            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-            "datefmt": "%Y-%m-%d %H:%M:%S",
-        },
-        "detailed": {
-            "format": "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s",
-            "datefmt": "%Y-%m-%d %H:%M:%S",
-        },
-    },
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
+from loguru import logger as loguru_logger
+
+try:
+    from .config import get_logging_config
+except Exception:
+    def get_logging_config() -> Dict[str, Any]:
+        return {
             "level": "INFO",
-            "formatter": "standard",
-            "stream": "ext://sys.stdout",
-        },
-        "file": {
-            "class": "logging.handlers.RotatingFileHandler",
-            "level": "DEBUG",
-            "formatter": "detailed",
-            "filename": "data/logs/tts_server.log",
-            "maxBytes": 10485760,  # 10MB
-            "backupCount": 5,
-            "encoding": "utf8",
-        },
-    },
-    "loggers": {
-        "": {  # root logger
-            "handlers": ["console", "file"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "tts_server": {
-            "handlers": ["console", "file"],
-            "level": "INFO",
-            "propagate": False,
-        },
-    },
-}
-
-# Global logger instance
-logger = logging.getLogger("tts_server")
+            "console": {"color": True},
+            "file": {"path": "data/logs/tts_server.log"},
+        }
 
 
-def setup_logging(config: Dict[str, Any] = None) -> None:
+def _ensure_log_dir(path: str) -> None:
+    try:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+
+
+class InterceptHandler(logging.Handler):
     """
-    Setup logging configuration.
-    
-    Args:
-        config: Logging configuration dictionary. If None, uses default config.
+    Redirect stdlib logging records to loguru while preserving message content
+    (including ANSI color sequences) so the console sink renders colors.
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            level = record.levelname
+        except Exception:
+            level = record.levelno
+
+        # Calculate stack depth so loguru attributes the log to the original caller
+        frame = logging.currentframe()
+        depth = 2
+        while frame is not None and frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
+
+        # Use record.getMessage() to preserve any ANSI color codes present
+        loguru_logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+
+
+def setup_logging(config: Optional[Dict[str, Any]] = None) -> None:
+    """
+    Configure loguru sinks (colored console + JSON file) and intercept the
+    standard logging module so third-party libraries' logs flow through loguru.
     """
     if config is None:
-        config = DEFAULT_LOGGING_CONFIG
-    
-    # Ensure logs directory exists
-    log_file_path = config.get("handlers", {}).get("file", {}).get("filename")
-    if log_file_path:
-        log_dir = Path(log_file_path).parent
-        log_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Configure logging
-    logging.config.dictConfig(config)
-    
-    # Log initial message
-    logger.info(
-        "Logging configured",
-        extra={
-            "log_level": logging.getLevelName(logger.level),
-            "log_file": log_file_path,
-        },
+        try:
+            config = get_logging_config()
+        except Exception:
+            config = {
+                "level": "INFO",
+                "console": {"color": True},
+                "file": {"path": "data/logs/tts_server.log"},
+            }
+
+    level = config.get("level", "INFO")
+    console_cfg = config.get("console", {})
+    file_cfg = config.get("file", {})
+
+    # Remove any existing loguru handlers before reconfiguring
+    loguru_logger.remove()
+
+    # Console sink (colorized)
+    colorize = bool(console_cfg.get("color", True))
+    console_format = console_cfg.get(
+        "format",
+        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+    )
+    loguru_logger.add(
+        sys.stdout,
+        colorize=colorize,
+        format=console_format,
+        level=level,
+        backtrace=True,
+        diagnose=True,
     )
 
+    # File sink (JSON)
+    file_path = file_cfg.get("path", "data/logs/tts_server.log")
+    _ensure_log_dir(file_path)
+    loguru_logger.add(
+        file_path,
+        serialize=True,
+        level=level,
+        rotation=file_cfg.get("rotation", "10 MB"),
+        retention=file_cfg.get("retention", "7 days"),
+        compression=file_cfg.get("compression", "zip"),
+        backtrace=True,
+        diagnose=True,
+    )
 
-def get_logger(name: str = None) -> logging.Logger:
+    # Replace stdlib handlers with our intercept handler
+    intercept_handler = InterceptHandler()
+    logging.root.handlers = [intercept_handler]
+    logging.root.setLevel(getattr(logging, level.upper(), logging.INFO))
+
+    # Ensure existing loggers propagate to root to avoid duplicate stdlib handlers
+    for name, logger_obj in list(logging.Logger.manager.loggerDict.items()):
+        try:
+            if isinstance(logger_obj, logging.Logger):
+                logger_obj.handlers = []
+                logger_obj.propagate = True
+        except Exception:
+            pass
+
+    loguru_logger.bind(component="logging").info("Logging configured", level=level, log_file=file_path)
+
+
+def get_logger(name: Optional[str] = None):
     """
-    Get a logger instance.
-    
-    Args:
-        name: Name of the logger. If None, returns the root TTS server logger.
-        
-    Returns:
-        Logger instance
+    Return a Loguru logger or a bound logger with a name for compatibility.
     """
-    if name is None:
-        return logger
-    return logging.getLogger(name)
+    if name:
+        return loguru_logger.bind(logger_name=name)
+    return loguru_logger
 
 
 def update_log_level(level: str) -> None:
     """
-    Update the logging level for the TTS server logger.
-    
-    Args:
-        level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    Update logging level by re-running setup with the new level (best-effort).
     """
-    numeric_level = getattr(logging, level.upper(), None)
-    if not isinstance(numeric_level, int):
-        raise ValueError(f"Invalid log level: {level}")
-    
-    logger.setLevel(numeric_level)
-    logger.info(f"Log level changed to {level.upper()}")
+    logging.root.setLevel(getattr(logging, level.upper(), logging.INFO))
+    try:
+        cfg = {}
+        try:
+            cfg = get_logging_config()
+        except Exception:
+            cfg = {"level": level}
+        cfg["level"] = level
+        setup_logging(cfg)
+    except Exception:
+        loguru_logger.warning("Failed to update logging level via setup; leaving current configuration in place")
 
 
-# Initialize logging on module import
+# Auto-configure on import; safe best-effort
 try:
-    # Try to load logging config from main config file
-    from .config import get_config
-    
-    config = get_config()
-    logging_config = config.get("logging", DEFAULT_LOGGING_CONFIG)
-    setup_logging(logging_config)
-    
-except ImportError:
-    # If config module is not available, use default config
-    setup_logging(DEFAULT_LOGGING_CONFIG)
-    logger.warning("Could not import config module, using default logging configuration")
-except Exception as e:
-    # If any other error occurs, use default config
-    setup_logging(DEFAULT_LOGGING_CONFIG)
-    logger.error(f"Error setting up logging: {e}, using default configuration")
+    setup_logging(get_logging_config())
+except Exception:
+    try:
+        setup_logging()
+    except Exception:
+        logging.basicConfig(level=logging.INFO)
+# Export logger for backward compatibility
+logger = loguru_logger

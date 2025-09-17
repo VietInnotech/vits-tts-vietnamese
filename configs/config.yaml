@@ -6,15 +6,15 @@ server:
     - "*"
 
 tts:
-  #model_path: "models/infore/vi_VN-vais1000-medium.onnx"
-  #config_path: "models/infore/vi_VN-vais1000-medium.onnx.json"
-  model_path: "models/v2/finetuning_pretrained_vi.onnx"
-  config_path: "models/v2/finetuning_pretrained_vi.onnx.json"
+  model_path: "models/infore/vi_VN-vais1000-medium.onnx"
+  config_path: "models/infore/vi_VN-vais1000-medium.onnx.json"
+  #model_path: "models/v2/finetuning_pretrained_vi.onnx"
+  #config_path: "models/v2/finetuning_pretrained_vi.onnx.json"
   audio_output_dir: "audio/"
   cache_size: 100
   default_speed: "normal"
-  noise_scale: 0.5
-  noise_w: 0.6
+  noise_scale: 0.4
+  noise_w: 0.5
 
 logging:
   level: "INFO"
