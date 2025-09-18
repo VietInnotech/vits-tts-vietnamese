@@ -2,16 +2,12 @@
 
 We use Piper library to finetuning VITS for TTS tasks with different voice in Vietnamese.
 
-We also built a Tornado server to deploy TTS model on microservice with Docker.
+We also built a LiteStar server to deploy TTS model on microservice with Docker.
 The server uses ONNX model type to infer lightweight and excellent performance.
 
 Video demo: https://youtu.be/1mAhaP26aQE
 
 Read Project Docs: [Paper](https://github.com/phatjkk/vits-tts-vietnamese/blob/main/TTS_VITS_Docs_NguyenThanhPhat.pdf)
-
-<p align="center">
-  <img  src="https://raw.githubusercontent.com/phatjkk/vits-tts-vietnamese/main/resources/web_ui.PNG">
-</p>
 
 # How to run this project?
 
@@ -39,20 +35,18 @@ The project now uses [`pixi.toml`](pixi.toml) for standardized dependency manage
 
 ## Configuration
 
-The application uses a [`config.yaml`](config.yaml) file for configuration. This allows you to customize various aspects of the application without modifying the code.
+The application uses a [`configs/config.yaml`](configs/config.yaml) file for configuration. This allows you to customize various aspects of the application without modifying the code.
 
-### Configuration File (`config.yaml`)
+### Configuration File (`configs/config.yaml`)
 
-The configuration file is located at [`config.yaml`](config.yaml) and contains the following sections:
+The configuration file is located at [`configs/config.yaml`](configs/config.yaml) and contains the following sections:
 
 #### Server Configuration
 
 ```yaml
 server:
   port: 8888 # Port for the TTS server
-  cors_origins: # Allowed CORS origins
-    - "http://localhost:3000"
-    - "http://127.0.0.1:3000"
+  host: "0.0.0.0" # Host to bind to
 ```
 
 #### TTS Configuration
@@ -62,6 +56,8 @@ tts:
   model_path: "fine-tuning-model/v2/finetuning_pretrained_vi.onnx" # Path to the ONNX model
   config_path: "fine-tuning-model/v2/finetuning_pretrained_vi.onnx.json" # Path to model config
   audio_output_dir: "audio/" # Directory for saving generated audio files
+  noise_scale: 0.5 # Audio generation noise scale
+  noise_w: 0.6 # Audio generation noise weight
 ```
 
 #### Logging Configuration
@@ -75,7 +71,7 @@ logging:
 
 To modify the configuration:
 
-1. Edit the [`config.yaml`](config.yaml) file directly
+1. Edit the [`configs/config.yaml`](configs/config.yaml) file directly
 2. The application will automatically pick up changes on restart
 
 ## Usage
@@ -88,13 +84,19 @@ With the pixi environment activated:
 pixi run server
 ```
 
+Alternatively, you can use the provided [`start.sh`](start.sh) script:
+
+```bash
+./start.sh
+```
+
 Or, if you prefer to run directly:
 
 ```bash
-python server.py
+PYTHONPATH=src python -m vits_tts.main
 ```
 
-The server will start on port 8888 by default (as specified in [`config.yaml`](config.yaml:2)).
+The server will start on port 8888 by default (as specified in [`configs/config.yaml`](configs/config.yaml:2)).
 
 ### With Docker (**_highly recommend_**):
 
@@ -152,11 +154,17 @@ http://localhost:{port}/audio/<hash>.wav
 - Returns WAV audio file
 - Content-Type: audio/x-wav
 
-The result seems like this:
+### API Documentation
 
-<p align="center">
-  <img  src="https://raw.githubusercontent.com/phatjkk/vits-tts-vietnamese/main/resources/demo_api.PNG">
-</p>
+The API is documented using OpenAPI and Swagger UI. You can access the interactive documentation at:
+
+```
+http://localhost:{port}/docs
+```
+
+The root endpoint (`/`) also redirects to the Swagger UI documentation.
+
+The result seems like this:
 
 ```json
 {
@@ -173,18 +181,6 @@ The speed has 5 options:
 - ✅ `fast`
 - ✅ `slow`
 - ✅ `very_fast`
-
-Or you can use the Web UI via this URL:
-
-```
-http://localhost:5004/
-```
-
-The repo of this React Front-end: [vits-tts-webapp](https://github.com/phatjkk/vits-tts-webapp)
-
-<p align="center">
-  <img  src="https://raw.githubusercontent.com/phatjkk/vits-tts-vietnamese/main/resources/web_ui.PNG">
-</p>
 
 ### Legacy Installation (Not Recommended)
 
@@ -230,6 +226,14 @@ Run code quality checks:
 
 ```bash
 pixi run lint
+```
+
+### Testing
+
+The project uses pytest for testing. Run tests with:
+
+```bash
+pixi run test
 ```
 
 # Result

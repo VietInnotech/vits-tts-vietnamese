@@ -1,45 +1,108 @@
 # Architecture
 
-This document outlines the architecture of the Vietnamese TTS project, including recent production-readiness improvements.
+This document outlines the architecture of the Vietnamese TTS project, including recent production-readiness improvements and the migration from Tornado to LiteStar, with a focus on API-only functionality.
 
-## Current Architecture (Migrated to Piper)
+## Current Architecture (LiteStar with Piper TTS)
 
-The architecture has been successfully migrated to use the Piper TTS engine with enhanced production features including standardized dependency management, externalized configuration, structured logging, and in-memory caching.
+The architecture has been successfully migrated to use the Piper TTS engine with the LiteStar API framework, featuring dependency injection, Pydantic models for request/response validation, and a modular component structure.
 
 ```mermaid
 graph TD
-    A[Input Text] --> B{Piper TTS Engine};
-    B --> C{Phonemization (espeak-ng)};
-    C --> D{VITS Model (ONNX)};
-    D --> E[Audio Output];
+    A[HTTP Request] --> B{LiteStar Application};
+    B --> C[TTSController];
+    C --> D{TTSService};
+    D --> E{Piper TTS Engine};
+    E --> F{Phonemization (espeak-ng)};
+    F --> G{VITS Model (ONNX)};
+    G --> H[Audio Output];
 
-    F[config.yaml] --> G[Configuration Module<br/>config.py];
-    G --> B;
-    G --> H[Server Port<br/>CORS Origins<br/>Model Paths];
+    I[config.yaml] --> J[Configuration Module<br/>config.py];
+    J --> B;
+    J --> D;
+    J --> H[Server Port<br/>Model Paths];
 
-    I[loguru] --> J[Logging Module<br/>logging_config.py];
-    J --> K[Structured JSON Logs<br/>File & Console Output];
+    K[loguru] --> L[Logging Module<br/>logging_config.py];
+    L --> M[Structured JSON Logs<br/>File & Console Output];
 
-    L[cachetools] --> M[In-Memory Cache<br/>LRU Strategy];
-    M --> N[Audio Data Storage<br/>Cache Hit/Miss];
-    N --> D;
-    N --> O[Audio File Output];
+    N[cachetools] --> O[In-Memory Cache<br/>LRU Strategy];
+    O --> P[Audio Data Storage<br/>Cache Hit/Miss];
+    P --> D;
+    P -> Q[Audio File Output];
+
+    R[Pydantic] --> S[API Schemas<br/>api/schemas.py];
+    S --> C;
 ```
+
+## LiteStar-Based Architecture
+
+The project has been refactored to use the LiteStar API framework, providing a modern, async-first Python API service with robust dependency injection and OpenAPI documentation capabilities.
+
+### Core Components
+
+1. **[`LiteStar Application`](src/vits_tts/app.py:63)**: Main application instance configured with routes, dependencies, and static files.
+2. **[`TTSController`](src/vits_tts/api/routers.py:8)**: Handles HTTP requests for TTS endpoints.
+3. **[`TTSService`](src/vits_tts/core/tts_service.py:11)**: Business logic layer for TTS processing.
+4. **[`PiperTTS`](src/vits_tts/tts.py:35)**: Core TTS engine wrapper for Piper model.
+5. **[`RootController`](src/vits_tts/api/routers.py:57)**: Handles root endpoint redirection to Swagger UI.
+
+### Project Structure
+
+The project is organized into three main components:
+
+```
+src/vits_tts/
+├── api/              # API layer
+│   ├── routers.py   # Route handlers and controllers
+│   └── schemas.py   # Pydantic models for request/response validation
+├── core/             # Core business logic
+│   ├── caching.py   # Caching utilities
+│   └── tts_service.py # TTS service implementation
+├── app.py            # LiteStar application factory
+├── main.py           # Application entry point
+├── config.py         # Configuration management
+├── tts.py            # Piper TTS implementation
+├── utils.py          # Audio processing utilities (unused)
+├── validate.py       # Tornado validation decorators (unused)
+└── ...
+```
+
+### API Documentation
+
+The application now includes auto-generated OpenAPI documentation powered by Litestar's built-in support. This provides a comprehensive view of the API endpoints, request/response schemas, and allows for interactive testing of the API.
+
+- **Swagger UI**: Accessible at `/docs` for interactive API exploration.
+- **OpenAPI Schema**: Available at `/schema/openapi.json` in JSON format.
+- **Root Redirect**: The root endpoint `/` redirects to the Swagger UI documentation.
+
+### Dependency Injection
+
+LiteStar's dependency injection system manages service lifecycles and dependencies:
+
+- **[`provide_piper_tts()`](src/vits_tts/app.py:44)**: Creates and configures the Piper TTS instance.
+- **[`provide_tts_service()`](src/vits_tts/app.py:51)**: Constructs the TTSService with its dependencies (cache, config, model).
+- **[`provide_audio_cache()`](src/vits_tts/core/caching.py)**: Provides the LRU cache instance.
+
+### Request/Response Validation
+
+Pydantic models in [`api/schemas.py`](src/vits_tts/api/schemas.py) ensure data validation:
+
+- **[`TTSRequest`](src/vits_tts/api/schemas.py:5)**: Validates incoming TTS requests.
+- **[`TTSResponse`](src/vits_tts/api/schemas.py:12)**: Defines the structure of TTS responses.
 
 ## Production-Ready Components
 
 ### 1. Configuration System
 
-The application now uses a YAML-based configuration system that externalizes all configuration from the codebase.
+The application uses a YAML-based configuration system that externalizes all configuration from the codebase.
 
 #### Components
 
-- **[`config.yaml`](../config.yaml)**: Main configuration file containing all settings
-- **[`config.py`](../config.py)**: Configuration loader and accessor module
+- **[`configs/config.yaml`](configs/config.yaml)**: Main configuration file containing all settings
+- **[`config.py`](src/vits_tts/config.py)**: Configuration loader and accessor module
 
 #### Features
 
-- **Externalized Configuration**: All settings are stored in [`config.yaml`](../config.yaml) rather than hardcoded
+- **Externalized Configuration**: All settings are stored in [`configs/config.yaml`](configs/config.yaml) rather than hardcoded
 - **Environment-Specific Settings**: Easy to switch between development, staging, and production configurations
 - **Validation**: Built-in validation and fallback to default values
 - **Type Safety**: Structured access to configuration sections
@@ -49,14 +112,14 @@ The application now uses a YAML-based configuration system that externalizes all
 ```yaml
 server:
   port: 8888 # Server port
-  cors_origins: # CORS policy origins
-    - "http://localhost:3000"
-    - "http://127.0.0.1:3000"
+  host: "0.0.0.0" # Host to bind to
 
 tts:
-  model_path: "fine-tuning-model/v2/finetuning_pretrained_vi.onnx" # ONNX model path
-  config_path: "fine-tuning-model/v2/finetuning_pretrained_vi.onnx.json" # Model config path
+  model_path: "models/v2/finetuning_pretrained_vi.onnx" # ONNX model path
+  config_path: "models/v2/finetuning_pretrained_vi.onnx.json" # Model config path
   audio_output_dir: "audio/" # Audio output directory
+  noise_scale: 0.4 # Audio generation noise scale
+  noise_w: 0.5 # Audio generation noise weight
 
 logging:
   level: "INFO" # Logging level
@@ -68,8 +131,8 @@ The application implements structured logging using `loguru` for improved observ
 
 #### Components
 
-- **[`logging_config.py`](../logging_config.py)**: Logger configuration module
-- **[`config.yaml`](../config.yaml)**: Logging configuration section
+- **[`logging_config.py`](src/vits_tts/logging_config.py)**: Logger configuration module
+- **[`configs/config.yaml`](configs/config.yaml)**: Logging configuration section
 
 #### Features
 
@@ -98,8 +161,8 @@ The application uses `cachetools` to implement an in-memory LRU (Least Recently 
 
 #### Components
 
-- **[`cachetools`](../pixi.toml:26)**: Dependency for caching functionality
-- **Cache Implementation**: Integrated into TTS processing pipeline
+- **[`caching.py`](src/vits_tts/core/caching.py)**: Cache implementation module
+- **Cache Integration**: Integrated into TTS processing pipeline via [`TTSService`](src/vits_tts/core/tts_service.py:11)
 
 #### Features
 
@@ -113,7 +176,7 @@ The application uses `cachetools` to implement an in-memory LRU (Least Recently 
 - **Cache Key**: Generated from text content and speed parameters
 - **Cache Size**: Configurable LRU cache size
 - **Cache Persistence**: In-memory only (application restart clears cache)
-- **File Output**: Original `/tts` endpoint saves to disk, `/tts/stream` uses memory cache directly
+- **Audio Serving**: Both `/tts` and `/tts/stream` endpoints utilize the in-memory cache for optimal performance
 
 ### 4. Standardized Dependency Management
 
@@ -121,8 +184,9 @@ The project uses `pixi` for dependency management to ensure reproducible builds 
 
 #### Components
 
-- **[`pixi.toml`](../pixi.toml)**: Main dependency specification file
+- **[`pixi.toml`](pixi.toml)**: Main dependency specification file
 - **Development Dependencies**: Includes linting and formatting tools
+- **Task Management**: Predefined tasks for development, testing, and deployment
 
 #### Features
 
@@ -130,59 +194,108 @@ The project uses `pixi` for dependency management to ensure reproducible builds 
 - **Cross-Platform**: Works consistently across different operating systems
 - **Development Tools**: Integrated `ruff` and `black` for code quality
 - **Environment Management**: Isolated Python environments
+- **Task Automation**: Predefined tasks like `pixi run server`, `pixi run test`, `pixi run lint`
 
-## Migration Overview
+#### Deployment Configuration
 
-The migration from the custom VITS implementation to Piper TTS has been completed with the following key improvements:
+The `pixi.toml` includes deployment-specific configurations:
+
+```toml
+[workspace]
+authors = ["lkless <leakless21@gmail.com>"]
+channels = ["conda-forge"]
+name = "vits-tts-vietnamese"
+platforms = ["linux-64","win-64"]
+version = "0.1.0"
+
+[tasks]
+server = "PYTHONPATH=src python -m vits_tts.main --no-ui"
+test = "PYTHONPATH=$PYTHONPATH:$(pwd)/src pytest"
+lint = "ruff check . && black --check ."
+
+[dependencies]
+python = "<3.13"
+loguru = ">=0.7.3,<0.8"
+
+[pypi-dependencies]
+litestar = ">=2.0.0"
+uvicorn = ">=0.23.2"
+piper-tts = ">=1.3.0, <2"
+# ... other dependencies
+```
+
+## Migration from Tornado to LiteStar
+
+The migration from Tornado to LiteStar has been completed with the following key improvements:
 
 ### Key Changes
 
-- **Simplified Architecture**: Replaced custom VITS implementation with `piper-tts` library
-- **Improved Performance**: Faster synthesis times (0.1-0.3s vs 1.0-1.2s)
-- **Streamlined Dependencies**: Maintained ONNX runtime compatibility
-- **Backward Compatibility**: Original API preserved for seamless transition
-- **Production Hardening**: Added configuration management, logging, and caching
-
-### Components
-
-1. **Piper TTS Engine**: Core synthesis engine that handles phonemization and audio generation
-2. **espeak-ng Integration**: Enhanced phonemization with Vietnamese language support
-3. **ONNX Runtime**: Continued use of existing Vietnamese voice models
-4. **API Compatibility Layer**: Maintains original function signatures
-5. **Configuration Management**: Externalized configuration via YAML
-6. **Structured Logging**: JSON-formatted logs for observability
-7. **In-Memory Caching**: Performance optimization using `cachetools`
+- **Framework Change**: Replaced Tornado with LiteStar for better async support and modern features
+- **Dependency Injection**: Implemented LiteStar's dependency injection system for better service management
+- **Request Validation**: Added Pydantic models for robust request/response validation
+- **Project Structure**: Refactored into `api`, `core`, and `app` components for better separation of concerns
+- **Testing**: Updated testing approach with LiteStar's test client
 
 ### Migration Benefits
 
-- **Performance**: 3-5x faster synthesis times
-- **Reliability**: More stable and well-tested codebase
-- **Maintainability**: Simplified code structure
-- **Extensibility**: Easier to add new features and voices
-- **Observability**: Structured logging for better debugging and monitoring
-- **Flexibility**: Externalized configuration for different environments
-- **Scalability**: In-memory caching for improved response times
+- **Performance**: Better async support for improved throughput
+- **Maintainability**: Cleaner code structure with dependency injection
+- **Developer Experience**: Enhanced tooling and type safety
+- **Scalability**: More robust architecture for future enhancements
+- **Documentation**: Built-in OpenAPI support
 
 ### Backward Compatibility
 
-The migration maintains full backward compatibility through the [`tts_migrated.py`](../tts_migrated.py) module, allowing seamless switching between implementations if needed.
+The API endpoints remain the same to ensure compatibility with existing clients:
+
+- `/tts`: File-based TTS synthesis
+- `/tts/stream`: Streaming TTS synthesis
+
+## Audio Serving Mechanism
+
+The API-only architecture provides two primary endpoints for audio synthesis, both optimized for performance and reliability:
+
+### `/tts` Endpoint
+
+- **Function**: Generates audio files and returns them as downloadable content
+- **Output Format**: WAV audio files with standard Vietnamese TTS processing
+- **Caching**: Utilizes LRU cache for repeated requests to minimize processing time
+- **File Management**: Audio files are stored in the configured output directory with unique filenames
+
+### `/tts/stream` Endpoint
+
+- **Function**: Provides streaming audio synthesis for real-time applications
+- **Output Format**: Direct audio streaming without intermediate file storage
+- **Performance**: Optimized for low-latency responses with in-memory caching
+- **Use Cases**: Ideal for applications requiring immediate audio playback
+
+### Audio Processing Pipeline
+
+Both endpoints follow the same optimized processing pipeline:
+
+1. **Request Validation**: Pydantic models validate input parameters
+2. **Cache Check**: LRU cache is queried for existing audio content
+3. **TTS Processing**: Piper TTS engine generates audio from text
+4. **Audio Enhancement**: Noise parameters applied for voice smoothness
+5. **Response Generation**: Audio returned in appropriate format (file download or stream)
 
 ## Component Responsibilities
 
-| Component                | Responsibility                       | Dependencies                                  | Interface                           |
-| ------------------------ | ------------------------------------ | --------------------------------------------- | ----------------------------------- |
-| **Piper TTS Engine**     | Audio synthesis from text            | `piper-tts`, `onnxruntime`, `piper-phonemize` | Text input → Audio output           |
-| **Configuration System** | Load and manage application settings | `pyyaml`                                      | Provides settings to all components |
-| **Logging System**       | Generate and manage application logs | `loguru`                                      | Logs events from all components     |
-| **Caching Layer**        | Store and retrieve audio data        | `cachetools`                                  | Cache hits reduce processing time   |
-| **Web Server**           | Handle HTTP requests and responses   | `tornado`                                     | HTTP interface for TTS services     |
-| **Model Loader**         | Load and manage ONNX models          | `onnxruntime`                                 | Provides model access to TTS engine |
+| Component         | Responsibility                          | Dependencies                     | Interface                        |
+| ----------------- | --------------------------------------- | -------------------------------- | -------------------------------- |
+| **LiteStar App**  | Application lifecycle and configuration | `litestar`, `uvicorn`            | HTTP server interface            |
+| **TTSController** | HTTP request handling and routing       | `TTSController`, `TTSService`    | RESTful API endpoints            |
+| **TTSService**    | Business logic for TTS processing       | `PiperTTS`, `LRUCache`, `config` | Service methods                  |
+| **PiperTTS**      | Core TTS synthesis functionality        | `piper-tts`, `onnxruntime`       | Text → Audio conversion          |
+| **Configuration** | Application settings management         | `pyyaml`                         | Config access for all components |
+| **Logging**       | Structured logging system               | `loguru`                         | Logging for all components       |
+| **Caching**       | In-memory audio data caching            | `cachetools`                     | Cache interface for TTSService   |
 
 ## Storage Considerations
 
-- **Model Storage**: ONNX models stored in `fine-tuning-model/` directory
+- **Model Storage**: ONNX models stored in `models/v2/` directory
 - **Audio Storage**: Generated audio files stored in `audio/` directory
-- **Log Storage**: Application logs stored in `logs/` directory with rotation
+- **Log Storage**: Application logs stored in `data/logs/` directory with rotation
 - **Cache Storage**: In-memory only, no persistent storage
 
 ## Compute Requirements
@@ -196,7 +309,7 @@ The migration maintains full backward compatibility through the [`tts_migrated.p
 ### External Interfaces
 
 - **HTTP API**: RESTful interface at `/tts` and `/tts/stream` endpoints
-- **Configuration File**: YAML-based configuration via [`config.yaml`](../config.yaml)
+- **Configuration File**: YAML-based configuration via [`configs/config.yaml`](configs/config.yaml)
 - **Log Output**: JSON-formatted logs to console and file
 
 ### Internal Interfaces
@@ -239,18 +352,28 @@ These parameters are configured in two locations within the project:
 
 1. **Model Configuration Files**: The parameters are defined in the `.onnx.json` configuration files associated with each model. For example:
 
-   - [`models/fine-tuning-model/v2/finetuning_pretrained_vi.onnx.json`](models/fine-tuning-model/v2/finetuning_pretrained_vi.onnx.json)
+   - [`models/v2/finetuning_pretrained_vi.onnx.json`](models/v2/finetuning_pretrained_vi.onnx.json)
 
 2. **Source Code Implementation**: The parameters are also hardcoded as global constants in the TTS module:
-   - [`src/vits_tts/tts.py`](src/vits_tts/tts.py)
+   - [`src/vits_tts/tts.py`](src/vits_tts/tts.py:31-32)
 
 ### Configuration Priority
 
-The `noise_scale` and `noise_w` parameters are now configurable in [`configs/config.yaml`](configs/config.yaml) and these values override the defaults set in the model's JSON configuration and the hardcoded values in [`src/vits_tts/tts.py`](src/vits_tts/tts.py). The configuration loading logic in [`src/vits_tts/tts.py`](src/vits_tts/tts.py:47-61) follows this priority order:
+The `noise_scale` and `noise_w` parameters are now configurable in [`configs/config.yaml`](configs/config.yaml) and these values override the defaults set in the model's JSON configuration and the hardcoded values in [`src/vits_tts/tts.py`](src/vits_tts/tts.py). The configuration loading logic in [`src/vits_tts/tts.py`](src/vits_tts/tts.py:69-76) follows this priority order:
 
 1. **YAML Configuration**: Values from `configs/config.yaml` (tts.noise_scale and tts.noise_w)
 2. **Model Configuration**: Values from the `.onnx.json` file (inference.noise_scale and inference.noise_w)
-3. **Hardcoded Defaults**: Fallback values defined in [`src/vits_tts/tts.py`](src/vits_tts/tts.py:27-28) (NOISE_SCALE = 0.5, NOISE_SCALE_W = 0.6)
+3. **Hardcoded Defaults**: Fallback values defined in [`src/vits_tts/tts.py`](src/vits_tts/tts.py:31-32) (NOISE_SCALE = 0.5, NOISE_SCALE_W = 0.6)
 
 This allows for easy tuning of voice smoothness through configuration changes without modifying the code or model files.
 When modifying these parameters, changes in the source code will take precedence during model inference, while the `.onnx.json` files typically serve as the reference configuration for the model itself.
+
+## Changelog
+
+### 2025-09-18 - Web Interface Removal
+
+- **Removed**: Web interface components and static file serving
+- **Updated**: Architecture refactored to API-only service
+- **Improved**: Audio serving mechanism documented and optimized
+- **Changed**: Configuration simplified by removing CORS and web-specific settings
+- **Enhanced**: Both `/tts` and `/tts/stream` endpoints now utilize in-memory caching for optimal performance

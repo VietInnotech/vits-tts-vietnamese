@@ -11,6 +11,7 @@ from typing import Optional
 from io import BytesIO
 import wave
 
+
 from piper import PiperVoice, SynthesisConfig
 from .config import get_tts_config
 from .logging_config import logger
@@ -40,6 +41,17 @@ class PiperTTS:
         # Load the voice model
         logger.info(f"Loading Piper voice model: {model_path}")
         self.voice = PiperVoice.load(model_path)
+        # Log attributes of the loaded voice to check for unexpected module references
+        logger.debug(f"PiperVoice instance attributes: {[attr for attr in dir(self.voice) if not attr.startswith('_')]}")
+        for attr_name in dir(self.voice):
+            if not attr_name.startswith('_'):
+                attr_value = getattr(self.voice, attr_name)
+                if isinstance(attr_value, type):
+                    logger.debug(f"PiperVoice.{attr_name} is a type: {attr_value}")
+                elif hasattr(attr_value, "__module__") and "pdb" in str(attr_value.__module__):
+                    logger.warning(
+                        f"PiperVoice.{attr_name} potentially related to pdb: {attr_value} (module: {getattr(attr_value, '__module__', 'N/A')})"
+                    )
 
         # Load configuration
         with open(self.config_path, "r", encoding="utf-8") as f:
@@ -241,3 +253,4 @@ if __name__ == "__main__":
     output_path = tts.text_to_speech(test_text, "normal")
 
     logger.info(f"Test completed. Audio saved to: {output_path}")
+
