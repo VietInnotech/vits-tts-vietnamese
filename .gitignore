@@ -3,7 +3,6 @@
 !.pixi/config.toml
 pixi.lock
 
-models/*
 # Python virtual environments
 venv/
 .venv/

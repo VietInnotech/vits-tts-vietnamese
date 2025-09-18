@@ -63,12 +63,43 @@
 **Severity**: Medium - affects automated testing but not production functionality
 **Status**: To be addressed in future test framework improvements
 
+**Required Fix**: Add `pytest-asyncio` to dependencies and configure in [`pytest.ini`](pytest.ini)
+
+```ini
+[tool:pytest]
+pythonpath = src
+asyncio_mode = auto
+```
+
 ### 2. Litestar Deprecation Warnings
 
-**Issue**: Deprecation warnings for `StaticFilesConfig` class
+**Issue**: Deprecation warnings for `StaticFilesConfig` class in [`src/vits_tts/app.py:16`](src/vits_tts/app.py:16)
 **Impact**: Code will need updating for future Litestar versions
 **Severity**: Low - functionality works, just warnings
 **Status**: To be addressed in future Litestar version upgrades
+
+**Affected Code**:
+
+```python
+from litestar.static_files import StaticFilesConfig  # Line 16 in app.py
+```
+
+**Recommended Fix**: Replace with newer Litestar API when available in stable version
+
+### 3. Code Cleanup - Unused Modules
+
+**Issue**: Several modules exist in the codebase but are not used in the current LiteStar implementation
+**Impact**: Technical debt increases codebase size and maintenance overhead
+**Severity**: Low - does not affect functionality
+**Status**: To be addressed in future refactoring efforts
+
+**Unused Modules**:
+
+- **[`src/vits_tts/utils.py`](src/vits_tts/utils.py)**: Audio processing utilities from original VITS implementation
+- **[`src/vits_tts/validate.py`](src/vits_tts/validate.py)**: Tornado-specific validation decorators
+- **[`src/vits_tts/debug_logger.py`](src/vits_tts/debug_logger.py)**: Custom debug logging superseded by `loguru`
+
+**Recommended Action**: Remove or refactor these modules to reduce technical debt
 
 ## Files Generated During Testing
 
@@ -93,5 +124,17 @@ The API functionality testing has been **successfully completed**. All core requ
 3. ✅ Streaming endpoint functions at `/tts/stream`
 4. ✅ No web interface remnants exist
 5. ✅ Both file generation and streaming endpoints work with sample requests
+6. ✅ API-only functionality confirmed - no POST endpoints implemented
 
-The system is ready for production use. The identified issues are related to test framework configuration and deprecation warnings, which do not affect the core functionality.
+The system is ready for production use. The identified issues are related to test framework configuration, deprecation warnings, and code cleanup, which do not affect the core functionality.
+
+### Migration Status: ✅ RESOLVED
+
+Previous concerns about migration gaps have been resolved through comprehensive testing:
+
+- **API-Only Implementation**: Confirmed that only GET endpoints with query parameters are implemented
+- **No POST Endpoints**: Verified that no POST endpoints exist in the current implementation
+- **Query-Only API**: All functionality is available through GET requests with query parameters
+- **Streaming Support**: Both `/tts` and `/tts/stream` endpoints work correctly with async streaming
+
+The migration from Tornado to LiteStar with Piper TTS has been completed successfully, with all core functionality working as expected.
