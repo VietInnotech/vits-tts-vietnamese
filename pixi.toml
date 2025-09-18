@@ -2,7 +2,7 @@
 authors = ["lkless <leakless21@gmail.com>"]
 channels = ["conda-forge"]
 name = "vits-tts-vietnamese"
-platforms = ["linux-64","win-64","linux-aarch64","osx-arm64","osx-64"]
+platforms = ["linux-64","win-64","linux-aarch64"]
 version = "0.1.0"
 
 [tasks]

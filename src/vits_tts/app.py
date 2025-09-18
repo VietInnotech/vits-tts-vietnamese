@@ -95,7 +95,7 @@ def create_app() -> Litestar:
     """
     # Load config once
     load_config()
-    config = get_config()
+    get_config()
 
     # Static files configuration: serve audio directory
     static_files = [

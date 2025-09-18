@@ -4,7 +4,6 @@ Tests core TTS functionality without complex async fixtures.
 """
 
 import pytest
-import asyncio
 from pathlib import Path
 from litestar import Litestar
 from litestar.testing import AsyncTestClient

@@ -9,10 +9,8 @@ Tests all TTS endpoints to ensure:
 """
 
 import asyncio
-import hashlib
-import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 import pytest
 from io import BytesIO
 
