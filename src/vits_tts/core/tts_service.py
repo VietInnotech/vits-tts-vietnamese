@@ -53,7 +53,39 @@ class TTSService:
 
         Returns:
             dict: Contains keys "hash", "text", "speed", and "file_name".
+
+        Raises:
+            ValueError: If text is empty or invalid
         """
+        # Validate input parameters
+        if not text or not text.strip():
+            raise ValueError("Text parameter cannot be empty")
+        
+        if not speed:
+            speed = "normal"  # Default fallback
+            
+        # Validate speed parameter
+        valid_speeds = ["very_slow", "slow", "normal", "fast", "very_fast"]
+        if speed not in valid_speeds:
+            # Try to map common variations
+            speed_mapping = {
+                "slow": "slow",
+                "normal": "normal",
+                "fast": "fast",
+                "very_slow": "very_slow",
+                "very_fast": "very_fast"
+            }
+            if speed in speed_mapping:
+                speed = speed_mapping[speed]
+            else:
+                # Default to normal for invalid speeds
+                speed = "normal"
+
+        # Validate text length (prevent memory issues)
+        max_text_length = 10000  # Reasonable limit for TTS
+        if len(text) > max_text_length:
+            raise ValueError(f"Text too long. Maximum length is {max_text_length} characters")
+
         text_hash = hashlib.sha1((text + speed).encode("utf-8")).hexdigest()
         file_name = f"{text_hash}.wav"
         file_path = Path(os.getcwd()) / self.audio_output_dir / file_name
@@ -72,7 +104,18 @@ class TTSService:
 
         # generate audio and save file using injected model
         output_path = str(Path(self.audio_output_dir) / file_name)
-        self.model.text_to_speech(text, speed, output_path)
+        
+        try:
+            self.model.text_to_speech(text, speed, output_path)
+        except ValueError as e:
+            # Re-raise validation errors from the model
+            raise ValueError(str(e))
+        except Exception as e:
+            # Log and re-wrap unexpected errors
+            import logging
+            logging.error(f"TTS synthesis failed: {str(e)}")
+            raise ValueError(f"Failed to synthesize audio: {str(e)}")
+        
         # mark cached
         self.cache[cache_key] = True
 
@@ -89,16 +132,46 @@ class TTSService:
 
         Returns:
             AsyncGenerator[bytes, None]: Generator that yields audio bytes in chunks.
+
+        Raises:
+            ValueError: If text is empty or invalid
         """
+        # Validate input parameters
+        if not text or not text.strip():
+            raise ValueError("Text parameter cannot be empty")
+        
+        if not speed:
+            speed = "normal"  # Default fallback
+            
+        # Validate speed parameter
+        valid_speeds = ["very_slow", "slow", "normal", "fast", "very_fast"]
+        if speed not in valid_speeds:
+            # Default to normal for invalid speeds
+            speed = "normal"
+
+        # Validate text length (prevent memory issues)
+        max_text_length = 10000  # Reasonable limit for TTS
+        if len(text) > max_text_length:
+            raise ValueError(f"Text too long. Maximum length is {max_text_length} characters")
+
         cache_key = f"stream:{hashlib.sha1((text + speed).encode('utf-8')).hexdigest()}"
 
         if cache_key in self.cache:
             audio_buffer: BytesIO = self.cache[cache_key]
             audio_buffer.seek(0)
         else:
-            audio_buffer = self.model.text_to_speech_streaming(text, speed)
-            audio_buffer.seek(0)
-            self.cache[cache_key] = audio_buffer
+            try:
+                audio_buffer = self.model.text_to_speech_streaming(text, speed)
+                audio_buffer.seek(0)
+                self.cache[cache_key] = audio_buffer
+            except ValueError as e:
+                # Re-raise validation errors from the model
+                raise ValueError(str(e))
+            except Exception as e:
+                # Log and re-wrap unexpected errors
+                import logging
+                logging.error(f"TTS streaming synthesis failed: {str(e)}")
+                raise ValueError(f"Failed to synthesize audio: {str(e)}")
 
         chunk_size = 8192
 

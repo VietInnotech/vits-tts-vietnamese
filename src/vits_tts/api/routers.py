@@ -4,8 +4,12 @@ Provides controller-based route handlers for file-based and streaming TTS.
 """
 
 from litestar import Controller, get
-from litestar.response import Stream, Redirect
+from litestar.response import Stream, Redirect, File
+from litestar.enums import MediaType
+from litestar.exceptions import HTTPException
 from typing import Dict, Any
+from litestar.status_codes import HTTP_307_TEMPORARY_REDIRECT
+from pathlib import Path
 
 from ..core.tts_service import TTSService
 from .schemas import TTSResponse
@@ -65,7 +69,7 @@ class RootController(Controller):
     @get()
     async def redirect_to_docs(self) -> Redirect:
         """Redirect to the Swagger UI documentation."""
-        return Redirect(path="/docs")
+        return Redirect(path="/docs", status_code=HTTP_307_TEMPORARY_REDIRECT)
     
     @get("/health")
     async def health_check(self) -> Dict[str, Any]:

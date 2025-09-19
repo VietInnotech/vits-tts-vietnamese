@@ -163,7 +163,13 @@ def docker_container_infore_model(docker_image: str) -> Generator[Dict[str, Any]
                     break
             except requests.RequestException:
                 if i == max_retries - 1:
-                    pytest.fail("Service did not become ready in time")
+                    # Get container logs for debugging
+                    logs_result = subprocess.run(
+                        ["docker", "logs", container_name],
+                        capture_output=True,
+                        text=True
+                    )
+                    pytest.fail(f"Service did not become ready in time. Container logs: {logs_result.stdout}\n{logs_result.stderr}")
                 time.sleep(2)
         
         yield {

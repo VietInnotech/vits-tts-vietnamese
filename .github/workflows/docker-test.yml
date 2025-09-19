@@ -42,10 +42,14 @@ jobs:
           mkdir -p /tmp/audio_output
           mkdir -p /tmp/test_logs
 
-      - name: Run container with volume mounts
+      - name: Run container with dynamic port allocation
         run: |
+          # Get a free port
+          PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
+          echo "Using dynamic port: $PORT"
+
           docker run -d --name vits-test \
-            -p 8888:8888 \
+            -p ${PORT}:8888 \
             -v /tmp/audio_output:/app/audio \
             -v /tmp/test_logs:/app/data/logs \
             -e TTS_AUDIO_OUTPUT_DIR=/app/audio \
@@ -56,11 +60,15 @@ jobs:
 
       - name: Verify health endpoint
         run: |
+          # Get the port that was used
+          PORT=$(docker port vits-test 8888/tcp | cut -d: -f2)
+          echo "Container health check on port: $PORT"
+
           # Check if container is running
           docker ps | grep vits-test
 
           # Test health endpoint
-          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8888/health || echo "000")
+          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${PORT}/health || echo "000")
           if [ "$response" != "200" ]; then
             echo "Health check failed with status code: $response"
             docker logs vits-test
@@ -68,7 +76,7 @@ jobs:
           else
             echo "Health check passed"
             # Show health response
-            curl -s http://localhost:8888/health | jq .
+            curl -s http://localhost:${PORT}/health | jq .
            fi
 
       - name: Cleanup orphaned containers and processes

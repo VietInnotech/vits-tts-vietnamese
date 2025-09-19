@@ -15,6 +15,9 @@ from litestar.datastructures import State
 from litestar.di import Provide
 from litestar.static_files import StaticFilesConfig
 from litestar.openapi.config import OpenAPIConfig
+from litestar.enums import MediaType
+from pathlib import Path
+from typing import Optional
 
 from .api.routers import TTSController, RootController
 from .core.caching import provide_audio_cache
@@ -99,7 +102,11 @@ def create_app() -> Litestar:
 
     # Static files configuration: serve audio directory
     static_files = [
-        StaticFilesConfig(path="/audio", directories=["audio"]),
+        StaticFilesConfig(
+            path="/audio",
+            directories=["audio"],
+            send_as_attachment=False
+        ),
     ]
  
     # Initialize state with deep_copy=False to prevent recursion during deepcopy
@@ -111,7 +118,15 @@ def create_app() -> Litestar:
         static_files_config=static_files,
         dependencies={"service": Provide(provide_tts_service, sync_to_thread=True)},
         state=state,
-        openapi_config=OpenAPIConfig(title="VITS-TTS API", version="1.0.0"),
+        openapi_config=OpenAPIConfig(
+            title="VITS-TTS API",
+            version="1.0.0",
+            # Ensure docs endpoint is properly configured
+            path="/docs",
+            # Enable scalar documentation UI
+            use_handler_docstrings=True,
+        ),
     )
  
     return app
+

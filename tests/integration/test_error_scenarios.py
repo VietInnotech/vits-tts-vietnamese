@@ -101,10 +101,10 @@ def test_special_characters_and_unicode(docker_container: Dict[str, Any]) -> Non
 
 def test_concurrent_requests(docker_container: Dict[str, Any]) -> None:
     """Test handling of concurrent requests."""
-    url = f"http://{docker_container['host']}:{docker_container['port']}/ts"
+    url = f"http://{docker_container['host']}:{docker_container['port']}/tts"
     texts = [
         "Concurrent request 1",
-        "Concurrent request 2", 
+        "Concurrent request 2",
         "Concurrent request 3"
     ]
     

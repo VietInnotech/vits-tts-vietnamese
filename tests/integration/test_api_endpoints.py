@@ -128,7 +128,9 @@ def test_audio_file_serving(docker_container: Dict[str, Any]) -> None:
     
     # Should return the audio file
     assert audio_response.status_code == 200
-    assert audio_response.headers.get("content-type") == "audio/wav"
+    # Accept both audio/wav and audio/x-wav as both are valid MIME types for WAV files
+    content_type = audio_response.headers.get("content-type", "")
+    assert content_type in ["audio/wav", "audio/x-wav"], f"Unexpected content-type: {content_type}"
     assert len(audio_response.content) > 0
 
 
