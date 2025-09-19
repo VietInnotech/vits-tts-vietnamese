@@ -101,20 +101,54 @@ The tests use the following environment variables for configuration:
 - `TTS_AUDIO_OUTPUT_DIR` - Directory for audio output
 - `LOG_LEVEL` - Logging level
 
-## Test Ports
+## Dynamic Port Allocation
 
-The tests use the following ports to avoid conflicts:
+The integration tests now use dynamic port allocation to prevent conflicts during parallel test execution. This feature automatically finds available ports for each test container.
 
-- 8888 - Default container
-- 8889 - InfoRE model container
-- 890 - V2 model container
-- 8891 - Volume persistence container
+### How It Works
+
+The [`get_free_port()`](tests/integration/conftest.py) function in [`conftest.py`](tests/integration/conftest.py) automatically detects available TCP ports and assigns them to test containers:
+
+```python
+def get_free_port():
+    """Get a free port on the host system."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
+```
+
+### Benefits
+
+- ✅ **No Port Conflicts**: Each test gets a unique port, eliminating "port already in use" errors
+- ✅ **Parallel Testing**: Multiple tests can run simultaneously without interference
+- ✅ **Dynamic Assignment**: Ports are assigned at runtime, ensuring availability
+- ✅ **Proper Cleanup**: Resources are automatically cleaned up after each test
+
+### Implementation Details
+
+- All Docker fixtures in [`conftest.py`](tests/integration/conftest.py) use dynamic ports
+- Each test container gets its own unique port allocation
+- The system automatically handles port binding and cleanup
+- No manual port management required for developers
 
 ## Cleanup
 
-The tests automatically clean up Docker containers and images after running. If a test fails and containers are left running, you can manually clean them up:
+The tests automatically clean up Docker containers and images after running. The dynamic port allocation system ensures that containers are properly cleaned up even if tests fail:
 
 ```bash
-docker stop vits-tts-test-container vits-tts-test-container-infore vits-tts-test-container-v2 vits-tts-test-container-volume
-docker rm vits-tts-test-container vits-tts-test-container-infore vits-tts-test-container-v2 vits-tts-test-container-volume
+# All test containers are automatically cleaned up after each test
+# No manual port-specific cleanup needed
+
+# If you need to manually clean up any remaining containers:
+docker stop $(docker ps -q --filter "name=vits-tts-test")
+docker rm $(docker ps -aq --filter "name=vits-tts-test")
 ```
+
+**Key Features:**
+
+- Automatic container cleanup after each test
+- Dynamic port allocation prevents resource conflicts
+- Proper resource management even on test failures
+- No manual port management required

@@ -236,6 +236,31 @@ Expected response:
 }
 ```
 
+### Dynamic Port Allocation for Testing
+
+For integration testing, the system implements dynamic port allocation to prevent port conflicts during parallel test execution:
+
+**Key Features:**
+
+- Automatic port detection using [`get_free_port()`](tests/integration/conftest.py) function
+- Each test container gets a unique port, eliminating conflicts
+- Supports parallel test execution without manual port management
+- Proper cleanup ensures no port conflicts remain after tests
+
+**Implementation Details:**
+
+- Added [`get_free_port()`](tests/integration/conftest.py) function in [`tests/integration/conftest.py`](tests/integration/conftest.py)
+- All integration test fixtures use dynamic ports instead of hardcoded values
+- Docker containers automatically bind to available ports
+- GitHub Actions workflow includes proper cleanup steps
+
+**Benefits:**
+
+- ✅ No more "port already in use" errors during parallel testing
+- ✅ Reliable CI/CD pipeline execution
+- ✅ Efficient resource utilization during test runs
+- ✅ Consistent test results across different environments
+
 ### TTS Functionality Test
 
 Test the text-to-speech functionality:

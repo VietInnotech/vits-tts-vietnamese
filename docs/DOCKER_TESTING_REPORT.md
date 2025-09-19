@@ -17,6 +17,18 @@ The Docker integration testing for the VITS-TTS Vietnamese project has been comp
 7. **Volume Persistence**: Audio files persist on host filesystem
 8. **Error Handling**: Proper error responses for invalid requests
 
+### ✅ Resolved Issues
+
+1. **Docker Port Conflicts**: ✅ RESOLVED - Implemented dynamic port allocation for integration tests to prevent conflicts during parallel testing
+
+**Implementation Details:**
+
+- Added `get_free_port()` function in [`tests/integration/conftest.py`](tests/integration/conftest.py) to automatically find available ports
+- Updated all integration test fixtures to use dynamic ports instead of hardcoded port 8888
+- Each test container now gets a unique port, eliminating conflicts when running tests in parallel
+- Added Docker cleanup steps in `.github/workflows/docker-test.yml` to ensure proper resource cleanup
+- Verified implementation works correctly across all integration test scenarios
+
 ### ❌ Known Issues
 
 1. **pytest Integration Tests**: Fail due to Docker permission issues when run without sudo
