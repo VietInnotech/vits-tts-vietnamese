@@ -26,11 +26,33 @@ jobs:
           load: true
           tags: vits-tts-vietnamese:test
 
-      - name: Run container
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install test dependencies
         run: |
-          docker run -d --name vits-test -p 8888:8888 vits-tts-vietnamese:test
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Create volume directories
+        run: |
+          mkdir -p /tmp/audio_output
+          mkdir -p /tmp/test_logs
+
+      - name: Run container with volume mounts
+        run: |
+          docker run -d --name vits-test \
+            -p 8888:8888 \
+            -v /tmp/audio_output:/app/audio \
+            -v /tmp/test_logs:/app/data/logs \
+            -e TTS_AUDIO_OUTPUT_DIR=/app/audio \
+            -e LOG_LEVEL=DEBUG \
+            vits-tts-vietnamese:test
           # Wait for container to start
-          sleep 10
+          sleep 15
 
       - name: Verify health endpoint
         run: |
@@ -49,8 +71,15 @@ jobs:
             curl -s http://localhost:8888/health | jq .
           fi
 
+      - name: Run integration tests
+        run: |
+          pytest tests/integration -v --tb=short
+
       - name: Cleanup
         if: always()
         run: |
           docker stop vits-test || true
           docker rm vits-test || true
+          # Clean up volume directories
+          rm -rf /tmp/audio_output
+          rm -rf /tmp/test_logs

@@ -5,7 +5,7 @@ We use Piper library to finetuning VITS for TTS tasks with different voice in Vi
 We also built a LiteStar server to deploy TTS model on microservice with Docker.
 The server uses ONNX model type to infer lightweight and excellent performance.
 
-Video demo: https://youtu.be/1mAhaP26aQE
+Video demo: <https://youtu.be/1mAhaP26aQE>
 
 Read Project Docs: [Paper](https://github.com/phatjkk/vits-tts-vietnamese/blob/main/TTS_VITS_Docs_NguyenThanhPhat.pdf)
 
@@ -20,7 +20,7 @@ Read Project Docs: [Paper](https://github.com/phatjkk/vits-tts-vietnamese/blob/m
 
 The project now uses [`pixi.toml`](pixi.toml) for standardized dependency management. This ensures reproducible environments and consistent builds across development and production.
 
-1. Install pixi by following the instructions at https://pixi.sh/
+1. Install pixi by following the instructions at <https://pixi.sh/>
 
 2. Install project dependencies:
 
@@ -29,6 +29,7 @@ The project now uses [`pixi.toml`](pixi.toml) for standardized dependency manage
    ```
 
 3. Activate the pixi environment:
+
    ```bash
    pixi shell
    ```
@@ -139,7 +140,7 @@ For development with live reloading and volume mounts:
 docker-compose up --build
 ```
 
-This will start the service on port 8888 (http://localhost:8888) with volume mounts for:
+This will start the service on port 8888 (<http://localhost:8888>) with volume mounts for:
 
 - Source code (`./src` → `/app/src`)
 - Configuration (`./configs` → `/app/configs`)
@@ -347,13 +348,13 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 Audio before finetuning voice (unmute to hear):
 
-https://github.com/phatjkk/vits-tts-vietnamese/assets/48487157/2a3f51b0-4d27-43a9-b5de-8925ddcc8a2b
+<https://github.com/phatjkk/vits-tts-vietnamese/assets/48487157/2a3f51b0-4d27-43a9-b5de-8925ddcc8a2b>
 
 Audio AFTER finetuining voice (unmute to hear):
 
-https://github.com/phatjkk/vits-tts-vietnamese/assets/48487157/e953f2cc-979d-4fa2-96b2-96786345723d
+<https://github.com/phatjkk/vits-tts-vietnamese/assets/48487157/e953f2cc-979d-4fa2-96b2-96786345723d>
 
-### Evaluation:
+### Evaluation
 
 ```
 ### Metrics in test data BEFORE finetuning:
@@ -368,14 +369,14 @@ Root Mean Square Error (lower is better): 1.97773962268741
 In TTS tasks, the output spectrogram for a given text can be represented in many different ways.
 So, loss functions like MSE and MAE are just used to encourage the model to minimize the difference between the predicted and target spectrograms.
 The right way to Evaluate TTS model is to use MOS(mean opinion scores) BUT it is a subjective scoring system and we need human resources to do it.
-Reference: https://huggingface.co/learn/audio-course/chapter6/evaluation
+Reference: <https://huggingface.co/learn/audio-course/chapter6/evaluation>
 
 # How do we preprocess data and fine-tuning?
 
 See **train_vits.ipynb** file in the repo or via this Google Colab:
 
-https://colab.research.google.com/drive/1UK6t_AQUw9YJ_RDFvXUJmWMu-oS23XQs?usp=sharing
+<https://colab.research.google.com/drive/1UK6t_AQUw9YJ_RDFvXUJmWMu-oS23XQs?usp=sharing>
 
-ProtonX New: https://protonx.io/news/hoc-vien-protonx-xay-dung-mo-hinh-chuyen-van-ban-thanh-giong-noi-tieng-viet-1698233526932
+ProtonX New: <https://protonx.io/news/hoc-vien-protonx-xay-dung-mo-hinh-chuyen-van-ban-thanh-giong-noi-tieng-viet-1698233526932>
 
 Author: Nguyen Thanh Phat - aka phatjk
