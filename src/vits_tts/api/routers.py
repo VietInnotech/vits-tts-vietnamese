@@ -22,7 +22,7 @@ class TTSController(Controller):
     injected TTSService (dependency name: "service").
     """
 
-    path = "/ts"
+    path = "/tts"
 
     @get()
     async def generate_tts(self, service: TTSService, text: str, speed: str = "normal") -> TTSResponse:
