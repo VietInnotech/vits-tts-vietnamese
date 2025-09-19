@@ -1,6 +1,7 @@
 """Integration tests for volume persistence in Docker containers."""
 
 import os
+import socket
 import tempfile
 import shutil
 import requests
@@ -8,6 +9,15 @@ import pytest
 import subprocess
 import time
 from typing import Generator, Dict, Any
+
+
+def get_free_port() -> int:
+    """Get a free port number by binding to port 0 and returning the assigned port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
 
 
 @pytest.fixture(scope="function")
@@ -23,12 +33,13 @@ def temp_audio_dir() -> Generator[str, None, None]:
 def docker_container_with_volume(docker_image: str, temp_audio_dir: str) -> Generator[Dict[str, Any], None, None]:
     """Run a Docker container with volume mount for testing."""
     container_name = "vits-tts-test-container-volume"
+    port = get_free_port()
     
     try:
         # Run the container with volume mount
         process = subprocess.Popen([
             "docker", "run", "--name", container_name,
-            "-p", "8891:8888",
+            "-p", f"{port}:8888",
             "-v", f"{temp_audio_dir}:/app/audio",
             "-e", "TTS_AUDIO_OUTPUT_DIR=/app/audio",
             "-e", "LOG_LEVEL=DEBUG",
@@ -58,7 +69,7 @@ def docker_container_with_volume(docker_image: str, temp_audio_dir: str) -> Gene
         max_retries = 30
         for i in range(max_retries):
             try:
-                response = requests.get("http://localhost:8891/health", timeout=5)
+                response = requests.get(f"http://localhost:{port}/health", timeout=5)
                 if response.status_code == 200:
                     break
             except requests.RequestException:
@@ -69,7 +80,7 @@ def docker_container_with_volume(docker_image: str, temp_audio_dir: str) -> Gene
         yield {
             "name": container_name,
             "host": "localhost",
-            "port": 8891,
+            "port": port,
             "audio_dir": temp_audio_dir
         }
         

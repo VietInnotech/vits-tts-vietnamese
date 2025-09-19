@@ -69,7 +69,14 @@ jobs:
             echo "Health check passed"
             # Show health response
             curl -s http://localhost:8888/health | jq .
-          fi
+           fi
+
+      - name: Cleanup orphaned containers and processes
+        run: |
+          # Remove any existing containers using the test image
+          docker rm -f $(docker ps -a -q --filter ancestor=vits-tts-vietnamese:test) || true
+          # Kill any processes using port 8888
+          lsof -ti:8888 | xargs kill -9 || true
 
       - name: Run integration tests
         run: |
