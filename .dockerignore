@@ -1,0 +1,71 @@
+# Ignore git and other version control files
+.git
+.gitignore
+.gitattributes
+
+# Ignore logs and temporary files
+*.log
+logs/
+!logs/.gitkeep
+
+# Ignore test files
+tests/
+*.test.py
+*.tests.py
+
+# Ignore documentation files
+docs/
+
+# Ignore IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+.pytype/
+eggs/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Ignore virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# Ignore pixi environments
+.pixi/
+
+# Ignore audio files (they're generated at runtime)
+audio/*
+!audio/.gitkeep
+
+# Ignore data files
+data/
+
+# Ignore conftest.py (used for testing)
+conftest.py
+
+# Ignore pytest configuration
+pytest.ini
+
+# Ignore any existing Docker images or builds
+Dockerfile.*
+.docker/

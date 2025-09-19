@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  vits-tts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./src:/app/src
+      - ./configs:/app/configs
+      - ./audio:/app/audio
+      - ./logs:/app/logs
+    environment:
+      - PYTHONPATH=/app/src
+      # Environment variables for configuration
+      # Uncomment and modify these to customize the service:
+      # - TTS_MODEL_PATH=models/infore/vi_VN-vais1000-medium.onnx
+      # - TTS_CONFIG_PATH=models/infore/vi_VN-vais1000-medium.onnx.json
+      # - TTS_AUDIO_OUTPUT_DIR=audio/
+      # - TTS_CACHE_SIZE=100
+      # - TTS_DEFAULT_SPEED=normal
+      # - TTS_NOISE_SCALE=0.4
+      # - TTS_NOISE_W=0.5
+      # - SERVER_PORT=8888
+      # - LOG_LEVEL=INFO
+    command: ["./start.sh"]
+    # Enable auto-reload for development
+    stdin_open: true
+    tty: true

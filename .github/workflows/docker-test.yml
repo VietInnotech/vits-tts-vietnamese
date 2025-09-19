@@ -1,0 +1,56 @@
+name: Docker Build and Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: vits-tts-vietnamese:test
+
+      - name: Run container
+        run: |
+          docker run -d --name vits-test -p 8888:8888 vits-tts-vietnamese:test
+          # Wait for container to start
+          sleep 10
+
+      - name: Verify health endpoint
+        run: |
+          # Check if container is running
+          docker ps | grep vits-test
+
+          # Test health endpoint
+          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8888/health || echo "000")
+          if [ "$response" != "200" ]; then
+            echo "Health check failed with status code: $response"
+            docker logs vits-test
+            exit 1
+          else
+            echo "Health check passed"
+            # Show health response
+            curl -s http://localhost:8888/health | jq .
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop vits-test || true
+          docker rm vits-test || true

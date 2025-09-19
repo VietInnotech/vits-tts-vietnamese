@@ -5,6 +5,7 @@ Provides controller-based route handlers for file-based and streaming TTS.
 
 from litestar import Controller, get
 from litestar.response import Stream, Redirect
+from typing import Dict, Any
 
 from ..core.tts_service import TTSService
 from .schemas import TTSResponse
@@ -21,7 +22,7 @@ class TTSController(Controller):
     injected TTSService (dependency name: "service").
     """
 
-    path = "/tts"
+    path = "/ts"
 
     @get()
     async def generate_tts(self, service: TTSService, text: str, speed: str = "normal") -> TTSResponse:
@@ -65,3 +66,12 @@ class RootController(Controller):
     async def redirect_to_docs(self) -> Redirect:
         """Redirect to the Swagger UI documentation."""
         return Redirect(path="/docs")
+    
+    @get("/health")
+    async def health_check(self) -> Dict[str, Any]:
+        """Health check endpoint.
+        
+        Returns:
+            Dict[str, Any]: Health status information.
+        """
+        return {"status": "healthy", "message": "TTS service is running"}

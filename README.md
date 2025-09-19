@@ -52,7 +52,7 @@ server:
 #### TTS Configuration
 
 ```yaml
-tts:
+ts:
   model_path: "fine-tuning-model/v2/finetuning_pretrained_vi.onnx" # Path to the ONNX model
   config_path: "fine-tuning-model/v2/finetuning_pretrained_vi.onnx.json" # Path to model config
   audio_output_dir: "audio/" # Directory for saving generated audio files
@@ -73,6 +73,24 @@ To modify the configuration:
 
 1. Edit the [`configs/config.yaml`](configs/config.yaml) file directly
 2. The application will automatically pick up changes on restart
+
+### Environment Variables (Docker)
+
+When running with Docker, you can override configuration values using environment variables:
+
+| Variable               | Description                   | Default Value                                  | Example                                         |
+| ---------------------- | ----------------------------- | ---------------------------------------------- | ----------------------------------------------- |
+| `TTS_MODEL_PATH`       | Path to the ONNX model file   | `models/v2/finetuning_pretrained_vi.onnx`      | `models/infore/vi_VN-vais1000-medium.onnx`      |
+| `TTS_CONFIG_PATH`      | Path to the model config JSON | `models/v2/finetuning_pretrained_vi.onnx.json` | `models/infore/vi_VN-vais1000-medium.onnx.json` |
+| `TTS_AUDIO_OUTPUT_DIR` | Directory for audio output    | `audio/`                                       | `output/`                                       |
+| `TTS_CACHE_SIZE`       | Cache size for TTS responses  | `100`                                          | `200`                                           |
+| `TTS_DEFAULT_SPEED`    | Default speech speed          | `normal`                                       | `fast`                                          |
+| `TTS_NOISE_SCALE`      | Noise scale parameter         | `0.4`                                          | `0.5`                                           |
+| `TTS_NOISE_W`          | Noise W parameter             | `0.5`                                          | `0.6`                                           |
+| `SERVER_PORT`          | Server port                   | `8888`                                         | `9000`                                          |
+| `LOG_LEVEL`            | Logging level                 | `INFO`                                         | `DEBUG`                                         |
+
+See [DOCKER.md](docs/DOCKER.md) for detailed instructions on using environment variables with Docker.
 
 ## Usage
 
@@ -98,24 +116,112 @@ PYTHONPATH=src python -m vits_tts.main
 
 The server will start on port 8888 by default (as specified in [`configs/config.yaml`](configs/config.yaml:2)).
 
-### With Docker (**_highly recommend_**):
+### With Docker (**_highly recommend_**)
 
-On your terminal, type these commands to build a Docker Image:
+This project includes Docker support for easy deployment. Both Vietnamese TTS models are now bundled in the Docker image:
+
+1. **InfoRE Model**: `models/infore/vi_VN-vais1000-medium.onnx` (~63.2 MB)
+2. **Fine-tuned V2 Model**: `models/v2/finetuning_pretrained_vi.onnx` (~63.1 MB) - **Default**
+
+#### Quick Start with Docker
+
+```bash
+# Build and run with default settings (V2 model)
+docker build -t vits-tts-vietnamese .
+docker run -d -p 8888:8888 vits-tts-vietnamese
+```
+
+#### Using Docker Compose (Recommended for Development)
+
+For development with live reloading and volume mounts:
+
+```bash
+docker-compose up --build
+```
+
+This will start the service on port 8888 (http://localhost:8888) with volume mounts for:
+
+- Source code (`./src` → `/app/src`)
+- Configuration (`./configs` → `/app/configs`)
+- Audio output (`./audio` → `/app/audio`)
+- Logs (`./logs` → `/app/logs`)
+
+**Note**: Models are now bundled in the image, so no external model volume mount is needed.
+
+#### Using Docker Directly
+
+To build and run with Docker directly:
+
+```bash
+# Build the image
+docker build -t vits-tts-vietnamese .
+
+# Run with default settings (V2 model)
+docker run -d -p 8888:8888 vits-tts-vietnamese
+```
+
+#### Custom Port Mapping
+
+To run on a different port (e.g., 5004):
+
+```bash
+docker run -d -p 5004:8888 vits-tts-vietnamese
+```
+
+Then access the API at `http://localhost:5004/tts?text=Xin chào bạn&speed=normal`
+
+For detailed Docker usage instructions, see [DOCKER.md](docs/DOCKER.md).
+
+### Model Selection
+
+#### Default Model (Fine-tuned V2)
+
+The V2 model is used by default - no configuration needed:
+
+```bash
+docker run -d -p 8888:8888 vits-tts-vietnamese
+```
+
+#### Using InfoRE Model
+
+Switch to the InfoRE model using environment variables:
+
+```bash
+docker run -d \
+  -e TTS_MODEL_PATH=models/infore/vi_VN-vais1000-medium.onnx \
+  -e TTS_CONFIG_PATH=models/infore/vi_VN-vais1000-medium.onnx.json \
+  -p 8888:8888 \
+  vits-tts-vietnamese
+```
+
+#### Using Custom Models
+
+To use your own model files:
+
+```bash
+docker run -d \
+  -v /path/to/your/models:/app/custom_models \
+  -e TTS_MODEL_PATH=custom_models/your_model.onnx \
+  -e TTS_CONFIG_PATH=custom_models/your_model.json \
+  -p 8888:8888 \
+  vits-tts-vietnamese
+```
+
+### Health Check Endpoint
+
+The Docker container includes a health check endpoint:
 
 ```
-docker build  ./ -f .Dockerfile -t vits-tts-vi:v1.0
+GET http://localhost:{port}/health
 ```
 
-Then run it with port 5004:
+Returns:
 
-```
-docker run -d -p 5004:8888 vits-tts-vi:v1.0
-```
-
-While the Docker Image was running, you now make a request to use the TTS task via this API on your browser.
-
-```
-http://localhost:5004/tts?text=Xin chào bạn&speed=normal
+```json
+{
+  "status": "healthy",
+  "message": "TTS service is running"
+}
 ```
 
 ### Text-to-Speech API
@@ -164,18 +270,18 @@ http://localhost:{port}/docs
 
 The root endpoint (`/`) also redirects to the Swagger UI documentation.
 
-The result seems like this:
+Example Response:
 
 ```json
 {
   "hash": "e6bc1768c82ae63ed8ee61ca2349efa4ef9f166e",
   "text": "xin chào bạn",
   "speed": "normal",
-  "audio_url": "http://localhost:5004/audio/e6bc1768c82ae63ed8ee61ca2349efa4ef9f166e.wav"
+  "audio_url": "http://localhost:8888/audio/e6bc1768c82ae63ed8ee61ca2349efa4ef9f166e.wav"
 }
 ```
 
-The speed has 5 options:
+Speed Options:
 
 - ✅ `normal`
 - ✅ `fast`
@@ -202,17 +308,6 @@ Now, you can access the TTS API with port 8888:
 http://localhost:8888/tts?text=Xin chào bạn&speed=normal
 ```
 
-The result also seems like this:
-
-```json
-{
-  "hash": "e6bc1768c82ae63ed8ee61ca2349efa4ef9f166e",
-  "text": "xin chào bạn",
-  "speed": "normal",
-  "audio_url": "http://localhost:5004/audio/e6bc1768c82ae63ed8ee61ca2349efa4ef9f166e.wav"
-}
-```
-
 # Development
 
 ### Code Quality
@@ -236,6 +331,18 @@ The project uses pytest for testing. Run tests with:
 pixi run test
 ```
 
+### Docker Development
+
+For Docker-based development:
+
+```bash
+# Development mode with live reloading
+docker-compose up --build
+
+# Production mode
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
 # Result
 
 Audio before finetuning voice (unmute to hear):
@@ -250,7 +357,7 @@ https://github.com/phatjkk/vits-tts-vietnamese/assets/48487157/e953f2cc-979d-4fa
 
 ```
 ### Metrics in test data BEFORE finetuning:
-Mean Square Error: (lower is better) 0.044785238588228825
+Mean Square Error: (lower is better) 0.04478523858822825
 Root Mean Square Error (lower is better): 2.0110066944004297
 =============================================
 ### Metrics in test data AFTER finetuning:
