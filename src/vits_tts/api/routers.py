@@ -57,8 +57,18 @@ class TTSController(Controller):
         Returns:
             Stream: A litestar Stream that yields WAV bytes with media_type "audio/wav".
         """
-        audio_gen = await service.handle_tts_streaming_request(text, speed)
-        return Stream(audio_gen, media_type="audio/wav")
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            logger.info(f"Streaming TTS for text: '{text}' with speed: '{speed}'")
+            audio_gen = await service.handle_tts_streaming_request(text, speed)
+            logger.info("TTS streaming generation successful")
+            return Stream(audio_gen, media_type="audio/wav")
+        except Exception as e:
+            logger.error(f"TTS streaming generation failed: {str(e)}", exc_info=True)
+            from litestar.exceptions import HTTPException
+            raise HTTPException(status_code=500, detail=f"TTS streaming generation failed: {str(e)}")
 
 
 class RootController(Controller):

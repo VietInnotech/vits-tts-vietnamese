@@ -21,7 +21,7 @@ from typing import Optional
 
 from .api.routers import TTSController, RootController
 from .core.caching import provide_audio_cache
-from .core.tts_service import TTSService
+from .core import TTSService
 from .config import load_config, get_config
 from .tts import create_piper_tts, PiperTTS
 
@@ -129,4 +129,3 @@ def create_app() -> Litestar:
     )
  
     return app
-

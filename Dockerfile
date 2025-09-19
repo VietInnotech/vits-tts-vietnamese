@@ -33,12 +33,15 @@ COPY start.sh ./
 # Make start script executable
 RUN chmod +x start.sh
 
+# Create a non-root user and set up proper permissions
+RUN adduser --disabled-password --gecos '' appuser && \
+    chown -R appuser:appuser /app && \
+    chmod 755 /app/audio
+
 # Expose the port the app runs on
 EXPOSE 8888
 
-# Create a non-root user
-RUN adduser --disabled-password --gecos '' appuser
-RUN chown -R appuser:appuser /app
+# Switch to non-root user
 USER appuser
 
 # Set PYTHONPATH
